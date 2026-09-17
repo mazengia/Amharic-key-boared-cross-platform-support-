@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import sys
 import time
 from pathlib import Path
@@ -30,6 +31,20 @@ ENGINE_NAME = "amharic_phonetic"
 COMPONENT_NAME = "org.amharic.Keyboard"
 
 transliterator = Transliterator()
+
+
+# ============================================================
+# Session diagnostics
+#
+# Xorg and Wayland deliver key/focus events differently.
+# Apps running under XWayland (most non-native-Wayland apps)
+# can, on some compositors, cause the *same* key event to
+# reach the engine twice. Logging the session type up front
+# makes that easy to diagnose if it ever comes back.
+# ============================================================
+
+SESSION_TYPE = os.environ.get("XDG_SESSION_TYPE", "unknown")
+WAYLAND_DISPLAY = os.environ.get("WAYLAND_DISPLAY", "")
 
 
 # ============================================================
@@ -100,14 +115,15 @@ class AmharicEngine(IBus.Engine):
         # ----------------------------------------------------
         # Duplicate-event protection
         #
-        # Some Wayland/XWayland/IBus combinations can result
-        # in the same key press reaching the engine twice.
+        # On XWayland (the compatibility layer most non-native
+        # Wayland apps still run through), the same physical
+        # keypress can be delivered to the engine twice in
+        # quick succession. On plain Xorg this basically never
+        # happens, so this guard is a no-op there and safe to
+        # always keep on.
         # ----------------------------------------------------
 
-        self.last_keyval = None
-        self.last_keycode = None
-        self.last_state = None
-        self.last_event_time = 0.0
+        self._reset_dedupe_state()
 
         # 50 milliseconds.
         #
@@ -116,10 +132,20 @@ class AmharicEngine(IBus.Engine):
         self.DUPLICATE_EVENT_WINDOW = 0.050
 
         print(
-            f"AmharicEngine initialized: {object_path}",
+            f"AmharicEngine initialized: {object_path} "
+            f"(session={SESSION_TYPE}, wayland_display={WAYLAND_DISPLAY!r})",
             flush=True,
         )
 
+    # ========================================================
+    # Dedupe state helpers
+    # ========================================================
+
+    def _reset_dedupe_state(self):
+        self.last_keyval = None
+        self.last_keycode = None
+        self.last_state = None
+        self.last_event_time = 0.0
 
     # ========================================================
     # Duplicate event detection
@@ -161,12 +187,30 @@ class AmharicEngine(IBus.Engine):
 
         return False
 
-
     # ========================================================
     # Key event processing
     # ========================================================
 
     def do_process_key_event(
+        self,
+        keyval,
+        keycode,
+        state,
+    ):
+
+        try:
+            return self._process_key_event(keyval, keycode, state)
+        except Exception as exc:
+            # A crash here can take the whole IBus daemon's
+            # connection to this engine down with it, on either
+            # session type. Never let an unexpected error escape.
+            print(
+                f"Unhandled error in do_process_key_event: {exc}",
+                flush=True,
+            )
+            return False
+
+    def _process_key_event(
         self,
         keyval,
         keycode,
@@ -294,7 +338,9 @@ class AmharicEngine(IBus.Engine):
         #     chr(keyval)
         #
         # because an IBus keyval is not always a Unicode
-        # codepoint.
+        # codepoint (this is what breaks on function keys,
+        # arrow keys, etc. and is a real risk on Wayland where
+        # extra synthetic keyvals can show up via XWayland).
         # ====================================================
 
         try:
@@ -413,6 +459,38 @@ class AmharicEngine(IBus.Engine):
 
 
     # ========================================================
+    # Focus handling
+    #
+    # Window-focus events are where Xorg and Wayland diverge
+    # the most (different window managers / compositors fire
+    # them with different timing and, under XWayland, sometimes
+    # twice). Always clearing state on focus change - rather
+    # than trusting stray leftover preedit - keeps behavior
+    # identical no matter which session type is running.
+    # ====================================================
+
+    def do_focus_in(self):
+
+        self.preedit = ""
+
+        self._reset_dedupe_state()
+
+        self.update_preedit()
+
+        super().do_focus_in()
+
+    def do_focus_out(self):
+
+        # Commit whatever was typed rather than silently
+        # dropping it when focus leaves the text field.
+        self.commit_preedit()
+
+        self._reset_dedupe_state()
+
+        super().do_focus_out()
+
+
+    # ========================================================
     # Reset
     # ========================================================
 
@@ -420,10 +498,7 @@ class AmharicEngine(IBus.Engine):
 
         self.preedit = ""
 
-        self.last_keyval = None
-        self.last_keycode = None
-        self.last_state = None
-        self.last_event_time = 0.0
+        self._reset_dedupe_state()
 
         self.update_preedit()
 
@@ -438,10 +513,7 @@ class AmharicEngine(IBus.Engine):
 
         self.preedit = ""
 
-        self.last_keyval = None
-        self.last_keycode = None
-        self.last_state = None
-        self.last_event_time = 0.0
+        self._reset_dedupe_state()
 
         self.update_preedit()
 
@@ -456,10 +528,7 @@ class AmharicEngine(IBus.Engine):
 
         self.preedit = ""
 
-        self.last_keyval = None
-        self.last_keycode = None
-        self.last_state = None
-        self.last_event_time = 0.0
+        self._reset_dedupe_state()
 
         super().do_destroy()
 
@@ -472,6 +541,12 @@ def main():
 
     print(
         "Initializing IBus...",
+        flush=True,
+    )
+
+    print(
+        f"Detected session: XDG_SESSION_TYPE={SESSION_TYPE!r}, "
+        f"WAYLAND_DISPLAY={WAYLAND_DISPLAY!r}",
         flush=True,
     )
 
@@ -488,7 +563,10 @@ def main():
     if not bus.is_connected():
 
         print(
-            "ERROR: Could not connect to IBus.",
+            "ERROR: Could not connect to IBus. On Wayland sessions, "
+            "make sure ibus-daemon is running (it isn't always "
+            "autostarted the same way it is under Xorg) - try "
+            "'ibus-daemon -drx' first.",
             flush=True,
         )
 
@@ -525,8 +603,6 @@ def main():
 
     # --------------------------------------------------------
     # Register engine.
-    #
-    # No custom AmharicEngineFactory is used.
     # --------------------------------------------------------
 
     factory.add_engine(
@@ -601,6 +677,11 @@ def main():
 
     print(
         f" Engine: {ENGINE_NAME}",
+        flush=True,
+    )
+
+    print(
+        f" Session: {SESSION_TYPE}",
         flush=True,
     )
 
