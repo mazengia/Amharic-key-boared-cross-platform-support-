@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../models/app_settings.dart';
+import '../models/keyboard_layout.dart';
+import '../services/ibus_service.dart';
+import '../services/settings_service.dart';
+
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -8,14 +13,73 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool enabled = true;
-  bool suggestions = true;
-  bool autoCommit = true;
+  final _settingsService = SettingsService();
+  final _ibusService = IBusService();
 
-  String selectedLayout = 'Phonetic';
+  AppSettings _settings = AppSettings.defaults;
+  bool _loading = true;
+  bool _applying = false;
+  String? _statusMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final loaded = await _settingsService.load();
+
+    if (!mounted) return;
+
+    setState(() {
+      _settings = loaded;
+      _loading = false;
+    });
+  }
+
+  Future<void> _updateSettings(AppSettings updated) async {
+    setState(() {
+      _settings = updated;
+    });
+
+    await _settingsService.save(updated);
+  }
+
+  Future<void> _apply() async {
+    setState(() {
+      _applying = true;
+      _statusMessage = null;
+    });
+
+    // ibus-daemon isn't always autostarted the same way on Xorg vs.
+    // Wayland sessions, so make sure it's up before touching engines.
+    await _ibusService.ensureDaemonRunning();
+
+    bool success;
+
+    if (_settings.enabled) {
+      success = await _ibusService.activate();
+    } else {
+      success = await _ibusService.restartIBus();
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _applying = false;
+      _statusMessage = success
+          ? 'Settings applied.'
+          : 'Could not reach IBus. Is ibus-daemon installed and running?';
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(32),
       child: Column(
@@ -44,11 +108,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   subtitle: const Text(
                     'Enable the system-wide Amharic input method.',
                   ),
-                  value: enabled,
+                  value: _settings.enabled,
                   onChanged: (value) {
-                    setState(() {
-                      enabled = value;
-                    });
+                    _updateSettings(_settings.copyWith(enabled: value));
                   },
                 ),
 
@@ -60,23 +122,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     'Select your preferred input layout.',
                   ),
                   trailing: DropdownButton<String>(
-                    value: selectedLayout,
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'Phonetic',
-                        child: Text('Phonetic'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Fidel',
-                        child: Text('Fidel'),
-                      ),
+                    value: _settings.layout,
+                    items: [
+                      for (final layout in KeyboardLayout.availableLayouts)
+                        DropdownMenuItem(
+                          value: layout,
+                          child: Text(layout),
+                        ),
                     ],
                     onChanged: (value) {
                       if (value == null) return;
-
-                      setState(() {
-                        selectedLayout = value;
-                      });
+                      _updateSettings(_settings.copyWith(layout: value));
                     },
                   ),
                 ),
@@ -88,11 +144,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   subtitle: const Text(
                     'Show candidate words while typing.',
                   ),
-                  value: suggestions,
+                  value: _settings.suggestions,
                   onChanged: (value) {
-                    setState(() {
-                      suggestions = value;
-                    });
+                    _updateSettings(_settings.copyWith(suggestions: value));
                   },
                 ),
 
@@ -103,11 +157,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   subtitle: const Text(
                     'Automatically commit completed words.',
                   ),
-                  value: autoCommit,
+                  value: _settings.autoCommit,
                   onChanged: (value) {
-                    setState(() {
-                      autoCommit = value;
-                    });
+                    _updateSettings(_settings.copyWith(autoCommit: value));
                   },
                 ),
               ],
@@ -128,18 +180,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const Expanded(
                     child: Text(
                       'The keyboard engine runs through IBus and works '
-                          'across Ubuntu applications.',
+                          'across Ubuntu applications, on both Xorg and '
+                          'Wayland sessions.',
                     ),
                   ),
 
                   FilledButton(
-                    onPressed: () {},
-                    child: const Text('Apply'),
+                    onPressed: _applying ? null : _apply,
+                    child: _applying
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Apply'),
                   ),
                 ],
               ),
             ),
           ),
+
+          if (_statusMessage != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              _statusMessage!,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
         ],
       ),
     );

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../models/keyboard_layout.dart';
+import '../widgets/status_card.dart';
+
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -26,30 +29,26 @@ class HomeScreen extends StatelessWidget {
 
           const SizedBox(height: 32),
 
-          Row(
+          const Row(
             children: [
               Expanded(
-                child: _StatusCard(
+                child: StatusCard(
                   icon: Icons.keyboard,
                   title: 'Keyboard',
                   value: 'Phonetic',
                 ),
               ),
-
-              const SizedBox(width: 16),
-
+              SizedBox(width: 16),
               Expanded(
-                child: _StatusCard(
+                child: StatusCard(
                   icon: Icons.language,
                   title: 'Language',
                   value: 'Amharic',
                 ),
               ),
-
-              const SizedBox(width: 16),
-
+              SizedBox(width: 16),
               Expanded(
-                child: _StatusCard(
+                child: StatusCard(
                   icon: Icons.check_circle,
                   title: 'Status',
                   value: 'Ready',
@@ -75,21 +74,21 @@ class HomeScreen extends StatelessWidget {
 
                   const SizedBox(height: 20),
 
-                  _Instruction(
+                  const _Instruction(
                     number: '1',
                     title: 'Enable the keyboard',
                     description:
                     'Enable Amharic Keyboard from the Settings page.',
                   ),
 
-                  _Instruction(
+                  const _Instruction(
                     number: '2',
                     title: 'Select Amharic',
                     description:
                     'Select the Amharic input method from Ubuntu.',
                   ),
 
-                  _Instruction(
+                  const _Instruction(
                     number: '3',
                     title: 'Start typing',
                     description:
@@ -117,73 +116,16 @@ class HomeScreen extends StatelessWidget {
 
                   const SizedBox(height: 20),
 
-                  const _Example(
-                    latin: 'selam',
-                    amharic: 'ሰላም',
-                  ),
-
-                  const _Example(
-                    latin: 'abebe',
-                    amharic: 'አበበ',
-                  ),
-
-                  const _Example(
-                    latin: 'bet',
-                    amharic: 'ቤት',
-                  ),
-
-                  const _Example(
-                    latin: 'ethiopia',
-                    amharic: 'ኢትዮጵያ',
-                  ),
+                  for (final example in KeyboardLayout.examples)
+                    _Example(
+                      latin: example.$1,
+                      amharic: example.$2,
+                    ),
                 ],
               ),
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _StatusCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String value;
-
-  const _StatusCard({
-    required this.icon,
-    required this.title,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Row(
-          children: [
-            Icon(icon, size: 32),
-
-            const SizedBox(width: 16),
-
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -1,42 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../models/keyboard_layout.dart';
+import '../widgets/keyboard_key.dart';
+
 class KeyboardScreen extends StatelessWidget {
   const KeyboardScreen({super.key});
-
-  static const rows = [
-    [
-      ('q', 'ቅ'),
-      ('w', 'ው'),
-      ('e', 'እ'),
-      ('r', 'ር'),
-      ('t', 'ት'),
-      ('y', 'ይ'),
-      ('u', 'ዑ'),
-      ('i', 'ኢ'),
-      ('o', 'ኦ'),
-      ('p', 'ፕ'),
-    ],
-    [
-      ('a', 'አ'),
-      ('s', 'ስ'),
-      ('d', 'ድ'),
-      ('f', 'ፍ'),
-      ('g', 'ግ'),
-      ('h', 'ህ'),
-      ('j', 'ጅ'),
-      ('k', 'ክ'),
-      ('l', 'ል'),
-    ],
-    [
-      ('z', 'ዝ'),
-      ('x', 'ጽ'),
-      ('c', 'ች'),
-      ('v', 'ቭ'),
-      ('b', 'ብ'),
-      ('n', 'ን'),
-      ('m', 'ም'),
-    ],
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -65,12 +33,12 @@ class KeyboardScreen extends StatelessWidget {
               padding: const EdgeInsets.all(32),
               child: Column(
                 children: [
-                  for (final row in rows) ...[
+                  for (final row in KeyboardLayout.phonetic) ...[
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         for (final key in row)
-                          _KeyboardKey(
+                          KeyboardKey(
                             latin: key.$1,
                             amharic: key.$2,
                           ),
@@ -98,59 +66,14 @@ class KeyboardScreen extends StatelessWidget {
 
                   const SizedBox(height: 16),
 
-                  const Text('selam → ሰላም'),
-                  const SizedBox(height: 8),
-                  const Text('abebe → አበበ'),
-                  const SizedBox(height: 8),
-                  const Text('bet → ቤት'),
-                  const SizedBox(height: 8),
-                  const Text('ethiopia → ኢትዮጵያ'),
+                  for (final example in KeyboardLayout.examples)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text('${example.$1} → ${example.$2}'),
+                    ),
                 ],
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _KeyboardKey extends StatelessWidget {
-  final String latin;
-  final String amharic;
-
-  const _KeyboardKey({
-    required this.latin,
-    required this.amharic,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 72,
-      height: 64,
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outlineVariant,
-        ),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            latin.toUpperCase(),
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-
-          const SizedBox(height: 4),
-
-          Text(
-            amharic,
-            style: const TextStyle(fontSize: 20),
           ),
         ],
       ),

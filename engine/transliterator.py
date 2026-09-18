@@ -1,6 +1,9 @@
 # engine/transliterator.py
-
-from mapping import FIDEL
+#
+# Note: this module used to `from mapping import FIDEL` but never
+# actually used FIDEL - the ALIASES/FINAL_CONSONANTS tables below are
+# self-contained. Removed the dead import; mapping.py is kept as a
+# reference table for future layouts (e.g. a direct Fidel layout).
 
 
 class Transliterator:

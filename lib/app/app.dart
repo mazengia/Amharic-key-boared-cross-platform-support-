@@ -4,6 +4,7 @@ import '../screens/home_screen.dart';
 import '../screens/keyboard_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/about_screen.dart';
+import '../widgets/sidebar.dart';
 import 'theme.dart';
 
 class AmharicKeyboardApp extends StatelessWidget {
@@ -42,36 +43,13 @@ class _MainScreenState extends State<MainScreen> {
     return Scaffold(
       body: Row(
         children: [
-          NavigationRail(
+          Sidebar(
             selectedIndex: selectedIndex,
             onDestinationSelected: (index) {
               setState(() {
                 selectedIndex = index;
               });
             },
-            labelType: NavigationRailLabelType.all,
-            destinations: const [
-              NavigationRailDestination(
-                icon: Icon(Icons.home_outlined),
-                selectedIcon: Icon(Icons.home),
-                label: Text('Home'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.keyboard_outlined),
-                selectedIcon: Icon(Icons.keyboard),
-                label: Text('Keyboard'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.settings_outlined),
-                selectedIcon: Icon(Icons.settings),
-                label: Text('Settings'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.info_outline),
-                selectedIcon: Icon(Icons.info),
-                label: Text('About'),
-              ),
-            ],
           ),
 
           const VerticalDivider(width: 1),
